@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-#             __                 
-#.--------.--|  |.-----.--------. 
-#|        |  _  ||__ --|        | 
+#             __
+#.--------.--|  |.-----.--------.
+#|        |  _  ||__ --|        |
 #|__|__|__|_____||_____|__|__|__|
 #*************************************************************************
 # PROGRAM: mdsm.sh (Multi-threaded TSM Backup Scheduler)                 *
@@ -37,8 +37,6 @@ set -o nounset   # abort on unbound variable
 set -o pipefail  # don't hide errors within pipes
 
 # set things up
-INCLREGX='""'
-EXCLREGX='""'
 TIMEOUT="23h"
 DSMCPATH="/usr/bin/dsmc"
 TOPLOGDIR="logs/"
@@ -74,18 +72,18 @@ function die() {
 }
 
 # check if SIGTERM was sent because of job failures or actual terminate signal
-function checkEnd() { 
+function checkEnd() {
     # If backups completed, exit with highest return code, else exit 255 to signal interruption
     [[ -e "${RCFILE:-}" ]] && highestrc=$(<"${RCFILE}") || highestrc=255
     # get the highest return code
-    if (( "${COMPLETED}" == 1 )); then        
+    if (( "${COMPLETED}" == 1 )); then
         exit "${highestrc}"
     fi
-    # otherwise the program was interrupted so return a 255        
+    # otherwise the program was interrupted so return a 255
     exit 255
 }
- 
-# execute from EXIT trap    
+
+# execute from EXIT trap
 function cleanup() {
     if [[ -e "${RCFILE:-}" ]]; then
         highestrc=$(<"${RCFILE}")
@@ -104,7 +102,7 @@ function cleanup() {
         log "removing temporary files"
         [[ -e "${LOG}.completed" ]] && rm "${LOG}.completed"
         [[ -e "${RCFILE:-}" ]] && rm "${RCFILE}"
-        log "stopping process group [${MYPID}]"        
+        log "stopping process group [${MYPID}]"
     fi
     pkill -g "${MYPID}"
 }
@@ -155,7 +153,7 @@ else
 fi
 
 # convert seconds to minutes and hours
-function convertDur () { 
+function convertDur () {
   local hh mm
   local dur=${1:-0}
   local ss=${dur}
@@ -166,7 +164,7 @@ function convertDur () {
 }
 
 # run incremental backup of $1, parameters are $2
-function ba () { 
+function ba () {
   local myFS myParm baStartTime baEndTime baRuntimeDur lastrc message
   [[ -z "${1:-}" ]] && die "nothing to backup"
   myFS=$1
@@ -207,7 +205,7 @@ function ba () {
 }
 
 # check to see how many backup processes this program has spawned
-function baProcs () { 
+function baProcs () {
   local dsmProcs localProc count
   count=0
   # dump the contents of ps to a file to read from to avoid multiple invokations
@@ -221,14 +219,14 @@ function baProcs () {
 }
 
 # Check for the presence of any .err files to pass errors through to the main program
-function checkErr () {   
+function checkErr () {
   if [[ -e "${LOG}.err" ]]; then
     cat "${LOG}.err" && rm "${LOG}.err"
   fi
 }
 
 # check for completed backups
-function checkDone () { 
+function checkDone () {
   local s w e f
   if [[ -e "${LOG}.completed" ]]; then
     tee -a "${LOG}" < "${LOG}.completed"
@@ -245,7 +243,7 @@ function checkDone () {
 }
 
 # shuffle filesystem array
-function shuffle () { 
+function shuffle () {
    local i tmp size max rand
    size=${#fs[*]}
    max=$(( 32768 / size * size ))
@@ -273,7 +271,7 @@ function logCleanup() {
 }
 
 # show backup summary
-function summary() { 
+function summary() {
     ENDTIME=$(date +%s)
     DURATION=$((ENDTIME - STARTTIME))
     NEWDURATION="$(convertDur ${DURATION})"
@@ -295,11 +293,11 @@ function summary() {
     log "Jobs completed successfully: ${success}"
     log "Jobs completed with warnings: ${warning}"
     log "Jobs completed with errors: ${error}"
-    log "Jobs failed: ${fail}"  
+    log "Jobs failed: ${fail}"
 }
 
 # show a list of filesystems to be backed up
-function showFsList () { 
+function showFsList () {
   local x localFs
   x=${numParentDir:-0}
   for localFs in "${fs[@]}"; do
@@ -313,27 +311,29 @@ fs=()
 
 if (( MODEBOOL == 0 )); then
   # use df to generate filesystem array
-  mapfile -t fs < <(df -P | awk -v incl="${INCLREGX:-.}" -v excl="${EXCLREGX:-}" 'NR > 1 && $6 ~ incl && !($6 ~ excl) {print $6}')
+  mapfile -t fs < <(df -P | awk -v incl="${INCLREGX:-.}" -v excl="${EXCLREGX:--}" 'NR > 1 && $6 ~ incl && !($6 ~ excl) {print $6}')
 fi
 
-if (( MODEBOOL == 1 )); then 
+if (( MODEBOOL == 1 )); then
   parentDir=()
-  
+
   # iterate through the filesystems set for LARGEFS mode
   for localLARGEFS in "${LARGEFS[@]}"; do
     parentDir+=( "${localLARGEFS%%/}/" )
-    
+
     # Use find to scan directories 1 level down
     while IFS= read -r localDir; do
       fs+=( "${localDir%%/}/" )
     done < <(find "${localLARGEFS}" -maxdepth 1 -mindepth 1 -type d 2>/dev/null)
   done
-  
+
   # get count of parent dir after processing to ignore problematic filesystems
   numParentDir="${#parentDir[@]}"
 fi
 
 numfs="${#fs[@]}"
+df -P | awk -v incl="${INCLREGX:-.}" -v excl="${EXCLREGX:-}" 'NR > 1 && $6 ~ incl && !($6 ~ excl) {print $6}'
+echo "${numfs}"
 (( "${numfs}" == 0 )) && die "cannot find any eligible filesystems for backup"
 shuffle
 
