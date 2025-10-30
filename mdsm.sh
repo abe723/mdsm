@@ -333,7 +333,6 @@ fi
 
 numfs="${#fs[@]}"
 df -P | awk -v incl="${INCLREGX:-.}" -v excl="${EXCLREGX:-}" 'NR > 1 && $6 ~ incl && !($6 ~ excl) {print $6}'
-echo "${numfs}"
 (( "${numfs}" == 0 )) && die "cannot find any eligible filesystems for backup"
 shuffle
 
